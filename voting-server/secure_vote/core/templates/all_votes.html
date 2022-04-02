@@ -1,0 +1,102 @@
+{% extends "base.html" %} {% block content %}
+
+<main>
+  <div class="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
+    {% if vote_details%} {% if is_valid %}
+    <div
+      class="flex p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-200 dark:text-green-800"
+      role="alert"
+    >
+      <svg
+        class="inline flex-shrink-0 mr-3 w-5 h-5"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+          clip-rule="evenodd"
+        ></path>
+      </svg>
+      <div>{{validity_message}}</div>
+    </div>
+    {% for vote in vote_details %}
+    <div
+      class="py-4 px-8 max-w-100 bg-white rounded-lg border border-green-700"
+    >
+      <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900">
+        Block Index: {{vote.index}}
+      </h5>
+      <hr class="mb-2 border-gray-300" />
+      <p
+        class="inline-flex items-center mb-3 mr-3 text-lg font-normal text-gray-700"
+      >
+        {{vote.candidate}}
+      </p>
+      <p
+        class="inline-flex items-center mb-3 text-md font-normal text-gray-700"
+      >
+        <b class="mr-2">Voter: </b> {{vote.voterhash}}
+      </p>
+      <br />
+      <hr class="mb-2 border-gray-300" />
+      <p class="mb-2 text-base text-gray-700 sm:text-lg">
+        <b>Time:</b> {{vote.timestamp}}
+      </p>
+    </div>
+
+    {% endfor %} {% else %}
+    <div
+      class="flex p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800"
+      role="alert"
+    >
+      <svg
+        class="inline flex-shrink-0 mr-3 w-5 h-5"
+        fill="currentColor"
+        viewBox="0 0 20 20"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+          clip-rule="evenodd"
+        ></path>
+      </svg>
+      <div>{{validity_message}}</div>
+    </div>
+    {% for vote in vote_details %}
+    <div class="py-4 px-8 max-w-100 bg-white rounded-lg border border-red-700">
+      <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900">
+        Block Index: {{vote.index}}
+      </h5>
+      <hr class="mb-2 border-gray-300" />
+      <p
+        class="inline-flex items-center mb-3 mr-3 text-lg font-normal text-gray-700"
+      >
+        {{vote.candidate}}
+      </p>
+      <p
+        class="inline-flex items-center mb-3 text-lg font-normal text-gray-700"
+      >
+        <b>Voter:</b> {{vote.voterhash}}
+      </p>
+      <br />
+      <hr class="mb-2 border-gray-300" />
+      <p class="mb-2 text-base text-gray-700 sm:text-lg">
+        <b>Time:</b> {{vote.timestamp}}
+      </p>
+    </div>
+
+    {% endfor %} {% endif %} {% else %}
+    <div
+      class="p-6 text-center max-w-100 bg-white rounded-lg border border-gray-700"
+    >
+      <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900">
+        No Votes in Blockchain
+      </h5>
+    </div>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

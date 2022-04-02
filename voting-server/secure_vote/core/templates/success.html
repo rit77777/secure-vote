@@ -1,0 +1,35 @@
+{% extends "base.html" %} {% block content %}
+<!-- Constituency info -->
+<main>
+  <div class="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
+    <div
+      class="p-4 w-full text-center bg-white rounded-lg border shadow-sm sm:p-8"
+    >
+      <h1 class="mb-2 text-4xl font-bold text-gray-900">Successfully Voted</h1>
+      <p class="mb-5 text-base text-gray-500 sm:text-lg">
+        Hello <b>{{user.name}}!</b><br />
+        To confirm your vote please verify the information provided below and
+        mine your block to add it in the blockchain
+      </p>
+      <h5 class="mb-5 text-base text-gray-700 sm:text-lg">
+        Voting for <b>{{voter_details.candidate}}</b>
+      </h5>
+      <div
+        class="justify-center items-center space-y-4 sm:flex sm:space-y-0 sm:space-x-4"
+      >
+        <a
+          type="button"
+          href="{% url 'mine'%}"
+          class="py-4 px-6 w-full sm:w-auto bg-indigo-700 hover:bg-indigo-800 focus:ring-4 focus:outline-none focus:ring-indigo-300 text-white rounded-lg text-center"
+        >
+          <div class="text-left">
+            <div class="font-sans text-md font-semibold">Seal Vote</div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</main>
+<!-- Constituency info end -->
+
+{% endblock content %}
