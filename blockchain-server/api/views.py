@@ -20,7 +20,7 @@ def consensus():
     current_len = len(blockchain.chain)
 
     for node in peers:
-        response = requests.get('{}chain'.format(node))
+        response = requests.get(f'{node}chain')
         length = response.json()['length']
         chain = response.json()['chain']
         if length > current_len and blockchain.check_chain_validity(chain):
@@ -44,8 +44,8 @@ def announce_new_block(block):
 def create_chain_from_dump(chain_dump):
     generated_blockchain = Blockchain()
     generated_blockchain.create_genesis_block()
-    for idx, block_data in enumerate(chain_dump):
-        if idx == 0:
+    for i, block_data in enumerate(chain_dump):
+        if i == 0:
             continue
         block = Block(block_data["index"],  block_data["transactions"], block_data["timestamp"], block_data["previous_hash"], block_data["nonce"])
         proof = block_data['hash']
