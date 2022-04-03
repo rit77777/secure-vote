@@ -96,7 +96,7 @@ def register_page(request):
             user.save()
             send_otp(phone, otp)
             request.session['phone'] = phone
-            messages.success(request, 'You are now registered and can log in')
+            messages.success(request, 'Please verify OTP to complete registration')
             return redirect('register_otp')
         except: 
             messages.error(request, 'error while registering')
@@ -224,8 +224,7 @@ def voting(request):
         messages.error(request, 'Voting in your constituency is currently not active')
         return redirect('home')
         
-    else:
-        return render(request, 'voting.html', {'constituency': constituency})
+    return render(request, 'voting.html', {'constituency': constituency})
 
 
 @login_required(login_url='login')
