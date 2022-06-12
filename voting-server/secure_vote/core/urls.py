@@ -20,17 +20,5 @@ urlpatterns = [
     path('submit/', views.submit, name='submit'),
     path('count_votes/', views.count_votes, name='count_votes'),
     path('chart_votes/', views.chart_votes, name='chart_votes'),
-
-    #------------------------Blockchain------------------------#
-    path('change_node/', views.change_node, name='change_node'),
     path('register_node/', views.register_node, name='register_node'),
-    path('connected_node/', views.connected_node, name='connected_node'),
-
-    #------------------------Blockchain------------------------#
-    # path('new_transaction/', views.new_transaction, name='new_transaction'),
-    # path('get_chain/', views.get_chain, name='get_chain'),
-    # path('mine_block/', views.mine_block, name='mine_block'),
-    # path('pending_transaction/', views.pending_transaction, name='pending_transaction'),
-
-    # path('tamper/', views.tamper, name='tamper'),
 ]

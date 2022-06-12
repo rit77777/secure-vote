@@ -11,4 +11,5 @@ urlpatterns = [
     path('add_block/', views.verify_and_add_block, name='verify_and_add_block'),
     path('pending_tx/', views.pending_transactions, name='pending_transactions'),
     path('chain_validity/', views.check_if_chain_tampered, name='check_if_chain_tampered'),
+    path('reset_blockchain/', views.reset_blockchain, name='reset_blockchain'),
 ]

@@ -176,3 +176,14 @@ def check_if_chain_tampered(request):
         return Response("Votes are not tampered", status=200)
     else:
         return Response("Votes are tampered", status=400)
+
+
+@api_view(['GET'])
+@csrf_exempt
+def reset_blockchain(request):
+    try:
+        blockchain.chain = []
+        blockchain.create_genesis_block()
+        return Response("Reset successful", status=200)
+    except Exception as e:
+        raise Exception(f"An error occured while reseting chain: {e}")
