@@ -9,7 +9,8 @@ urlpatterns = [
     path('register_node/', views.register_new_peers, name="register_new_peers"),
     path('register_with/', views.register_with_existing_node, name="register_with_existing_node"),
     path('add_block/', views.verify_and_add_block, name='verify_and_add_block'),
-    path('pending_tx/', views.pending_transactions, name='pending_transactions'),
+    path('pending_transactions/', views.pending_transactions, name='pending_transactions'),
     path('chain_validity/', views.check_if_chain_tampered, name='check_if_chain_tampered'),
     path('reset_blockchain/', views.reset_blockchain, name='reset_blockchain'),
+    path('tamper_block/', views.tamper_block, name='tamper_block'),
 ]

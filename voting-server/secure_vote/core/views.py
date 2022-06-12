@@ -8,10 +8,9 @@ import requests
 import random
 from hashlib import sha256
 
-from .models import  Constituency,RegisteredVoters, UniqueID
+from .models import Constituency, RegisteredVoters, UniqueID
 
-
-BLOCKCHAIN_NODE_ADDRESS = "http://rit77777.pythonanywhere.com"
+BLOCKCHAIN_NODE_ADDRESS = "http://127.0.0.1:8000"
 
 
 # ------------Registration And Login-----------------------
@@ -75,20 +74,20 @@ def register_page(request):
         try:
             otp = str(random.randint(100000, 999999))
             print("cid:  ", unique_id_details.c_id)
-            user = RegisteredVoters.objects.create_user(username=username, 
-                                                        name=name, 
-                                                        email=email, 
-                                                        phone=phone, 
-                                                        age=age, 
-                                                        password=password, 
-                                                        otp=otp, 
+            user = RegisteredVoters.objects.create_user(username=username,
+                                                        name=name,
+                                                        email=email,
+                                                        phone=phone,
+                                                        age=age,
+                                                        password=password,
+                                                        otp=otp,
                                                         c_id=unique_id_details.c_id)
             user.save()
             send_otp(phone, otp)
             request.session['phone'] = phone
             messages.success(request, 'Please verify OTP to complete registration')
             return redirect('register_otp')
-        except: 
+        except:
             messages.error(request, 'error while registering')
             return redirect('register')
     else:
@@ -110,7 +109,7 @@ def register_otp(request):
             print('Wrong OTP')
             messages.error(request, 'You entered wrong OTP')
             return render(request, 'register_otp.html', {'phone': phone})
-    
+
     return render(request, 'register_otp.html', {'phone': phone})
 
 
@@ -138,7 +137,7 @@ def login_page(request):
         if not constituency.is_active:
             messages.error(request, 'Voting in your constituency is currently not active')
             return redirect('login')
-        
+
         if not voter.account_verified:
             messages.error(request, 'Account not verified, Please verify your account')
             otp = str(random.randint(100000, 999999))
@@ -181,7 +180,7 @@ def login_otp(request):
             print('Wrong OTP')
             messages.error(request, 'You entered wrong OTP')
             return render(request, 'login_otp.html', {'phone': phone})
-    
+
     return render(request, 'login_otp.html', {'phone': phone})
 
 
@@ -209,11 +208,11 @@ def voting(request):
     if request.user.vote_done:
         messages.error(request, 'You cannot vote more than once')
         return redirect('home')
-    
+
     if not constituency.is_active:
         messages.error(request, 'Voting in your constituency is currently not active')
         return redirect('home')
-        
+
     return render(request, 'voting.html', {'constituency': constituency})
 
 
@@ -224,7 +223,8 @@ def submit(request):
 
         if request.user.is_authenticated:
             voter = RegisteredVoters.objects.get(username=request.user.username)
-            voter_hash_string = str(request.user.username) + str(request.user.email) + str(request.user.name) + str(request.user.phone) + str(request.user.age)
+            voter_hash_string = str(request.user.username) + str(request.user.email) + str(request.user.name) + str(
+                request.user.phone) + str(request.user.age)
             voter_hashed_value = sha256(voter_hash_string.encode()).hexdigest()
 
             vote_transaction = {
@@ -232,14 +232,15 @@ def submit(request):
                 "voterhash": voter_hashed_value
             }
 
-            response = requests.post(f"{BLOCKCHAIN_NODE_ADDRESS}/new_transaction/", json=vote_transaction, headers={'Content-type': 'application/json'})
+            response = requests.post(f"{BLOCKCHAIN_NODE_ADDRESS}/new_transaction/", json=vote_transaction,
+                                     headers={'Content-type': 'application/json'})
 
             response_data = response.json()
             print(response_data)
 
             if response.status_code == 201:
                 voter.vote_done = True
-                voter.save()  # change this 
+                # voter.save()  # change this
                 return render(request, 'success.html', {'voter_details': data})
             else:
                 return render(request, 'error.html', {'error_message': response_data['error']})
@@ -280,25 +281,21 @@ def all_votes(request):
                 vote_data.append(transaction)
 
         print("final", vote_data)
-    
+
     response = requests.get(f"{BLOCKCHAIN_NODE_ADDRESS}/chain_validity")
-    if response.status_code == 200:
-        validity_message = json.loads(response.content)
-        is_valid = True
-        print(validity_message, is_valid)
-    elif response.status_code == 400:
-        validity_message = json.loads(response.content)
-        is_valid = False
-        print(validity_message, is_valid)
-    
-    return render(request, 'all_votes.html', { 'vote_details': vote_data, 'validity_message': validity_message, 'is_valid': is_valid})
+    is_valid = True if response.status_code == 200 else False
+    validity_message = response.content
+    print(validity_message, is_valid)
+
+    return render(request, 'all_votes.html',
+                  {'vote_details': vote_data, 'validity_message': validity_message, 'is_valid': is_valid})
 
 
 def fetch_votes_and_count():
     vote_count = {}
     res = requests.get(f'{BLOCKCHAIN_NODE_ADDRESS}/chain')
     data = res.json()['chain']
-    
+
     for i in data:
         for j in i['transactions']:
             if j['candidate'] in vote_count:
@@ -340,10 +337,10 @@ def register_node(request):
         global BLOCKCHAIN_NODE_ADDRESS
         node_address = request.POST.get('nodeaddr')
         headers = {
-        'Content-Type': 'application/json',
+            'Content-Type': 'application/json',
         }
 
-        data = '{'+f'"node_address": "{BLOCKCHAIN_NODE_ADDRESS}"'+'}'
+        data = '{' + f'"node_address": "{BLOCKCHAIN_NODE_ADDRESS}"' + '}'
 
         response = requests.post(f'{node_address}/register_with/', headers=headers, data=data)
         print(response.content)
