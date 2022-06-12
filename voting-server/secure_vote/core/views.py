@@ -290,6 +290,16 @@ def all_votes(request):
     return render(request, 'all_votes.html',
                   {'vote_details': vote_data, 'validity_message': validity_message, 'is_valid': is_valid})
 
+@login_required(login_url='login')
+def sync_with_honest_nodes(request):
+    if request.method == 'POST':
+        try:
+            response = requests.get(f"{BLOCKCHAIN_NODE_ADDRESS}/sync_with_honest_nodes")
+            message = response.content
+        except:
+            return render(request, '404.html')
+    pass
+
 
 def fetch_votes_and_count():
     vote_count = {}

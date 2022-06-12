@@ -4,16 +4,21 @@ from hashlib import sha256
 
 
 class Block:
-    def __init__(self, index, transactions, timestamp, previous_hash, nonce=0):
+    def __init__(self, index, transactions, timestamp, previous_hash, nonce=0, blockhash='0'):
         self.index = index
         self.transactions = transactions
         self.timestamp = timestamp
         self.previous_hash = previous_hash
         self.nonce = nonce
+        self.blockhash = blockhash
 
     def compute_hash(self):
         block_string = json.dumps(self.__dict__, sort_keys=True)
         return sha256(block_string.encode()).hexdigest()
+
+    @staticmethod
+    def from_json(block_json):
+        return Block(**block_json)
 
 
 class Blockchain:
@@ -27,7 +32,7 @@ class Blockchain:
 
     def create_genesis_block(self):
         genesis_block = Block(0, [], 0, "0")
-        genesis_block.hash = genesis_block.compute_hash()
+        genesis_block.blockhash = genesis_block.compute_hash()
         self.chain.append(genesis_block)
 
     @property
@@ -38,7 +43,7 @@ class Blockchain:
         self.nodes.add(peer)
 
     def add_block(self, block, proof):
-        previous_hash = self.last_block.hash
+        previous_hash = self.last_block.blockhash
 
         if previous_hash != block.previous_hash:
             return False
@@ -46,7 +51,7 @@ class Blockchain:
         if not Blockchain.is_valid_proof(block, proof):
             return False
 
-        block.hash = proof
+        block.blockhash = proof
         self.chain.append(block)
         self.already_voted.add(block.transactions[0]['voterhash'])
         return True
@@ -75,18 +80,21 @@ class Blockchain:
 
     @classmethod
     def check_chain_validity(cls, chain):
+        print("inside chain validity", chain)
         result, previous_hash = True, '0'
         for i, block in enumerate(chain):
-            block_hash = block.hash
+            block_hash = block.blockhash
             if i == 0:
                 previous_hash = block_hash
+                continue
             else:
-                delattr(block, 'hash')
+                block.blockhash = '0'
                 if not cls.is_valid_proof(block, block_hash) or previous_hash != block.previous_hash:
-                    result, block.hash = False, block_hash
+                    result, block.blockhash = False, block_hash
                     break
-                block.hash = previous_hash = block_hash
+                block.blockhash, previous_hash = block_hash, block_hash
         return result
+
 
     def mine(self):
         if not self.unconfirmed_transactions:
@@ -99,7 +107,7 @@ class Blockchain:
             new_block = Block(prev_block.index + 1,
                               first_unconfirmed_transactions_list,
                               str(datetime.datetime.now()),
-                              prev_block.hash)
+                              prev_block.blockhash)
             proof = self.proof_of_work(new_block)
             self.add_block(new_block, proof)
             self.unconfirmed_transactions.pop(0)

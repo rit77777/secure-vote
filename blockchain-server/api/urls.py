@@ -13,4 +13,5 @@ urlpatterns = [
     path('chain_validity/', views.check_if_chain_tampered, name='check_if_chain_tampered'),
     path('reset_blockchain/', views.reset_blockchain, name='reset_blockchain'),
     path('tamper_block/', views.tamper_block, name='tamper_block'),
+    path('sync_with_honest_nodes/', views.sync_with_honest_nodes, name='sync_with_honest_nodes'),
 ]

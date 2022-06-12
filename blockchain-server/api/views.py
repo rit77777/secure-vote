@@ -13,17 +13,32 @@ blockchain.create_genesis_block()
 
 def consensus():
     global blockchain
+    print("block::chain ::::::::::", blockchain.chain)
     longest_chain, current_length = None, len(blockchain.chain)
 
     for node in blockchain.nodes:
         response = requests.get(f'{node}/chain')
         length = response.json()['length']
-        chain = response.json()['chain']
-        if length > current_length and blockchain.check_chain_validity(chain):
-            current_length, longest_chain = length, chain
+        print("length::", length)
+        chain_json = response.json()['chain']
+        print("dump::", chain_json)
+        formatted_chain = Blockchain()
+        formatted_chain.create_genesis_block()
+        formatted_chain.chain = list(
+            map(lambda block_json: Block.from_json(block_json), chain_json)
+        )
+        print("formatted chain::", formatted_chain.chain)
+        # chain_json = json.dumps(chain_json)
+        if length > current_length and blockchain.check_chain_validity(formatted_chain.chain):
+        # result = blockchain.check_chain_validity(formatted_chain.chain)
+        # if result:
+            print("inside consensusssssssssssssssssssssssssssssssssssss")
+            print("after::", formatted_chain.chain)
+            current_length, longest_chain = length, formatted_chain.chain
 
     if longest_chain:
-        blockchain = longest_chain
+        print("finally::", longest_chain)
+        blockchain.chain = longest_chain
         return True
 
     return False
@@ -47,7 +62,7 @@ def create_chain_from_dump(chain_dump):
                       block_data["timestamp"],
                       block_data["previous_hash"],
                       block_data["nonce"])
-        proof = block_data['hash']
+        proof = block_data['blockhash']
         added = generated_blockchain.add_block(block, proof)
         if not added:
             raise Exception("The chain dump is tampered!!")
@@ -99,8 +114,14 @@ def mine_block(request):
         return Response("No transactions in queue to mine", status=404)
     else:
         chain_length = len(blockchain.chain)
+        backup_chain = blockchain.chain
         consensus()
+        print("in mine_block: ")
+        print(f"chain: {backup_chain}")
+        print(f"blockchain.chain: {blockchain.chain}")
+        print(f"chain length: {chain_length} and blockchain.chain: {len(blockchain.chain)}")
         if chain_length == len(blockchain.chain):
+            print("inside announce")
             announce_new_block(blockchain.last_block)
         return Response(f"Block #{blockchain.last_block.index} is mined. Your vote is now added to the blockchain",
                         status=201)
@@ -113,7 +134,6 @@ def register_new_peers(request):
     if not node_address:
         return Response("Invalid data", status=400)
     blockchain.add_peer(node_address[:-1])
-    # peers.add(str(request.build_absolute_uri('/')))
     # print(f"Host: {str(request.build_absolute_uri('/'))} and Peer: {node_address}")
     chain_data = []
     for block in blockchain.chain:
@@ -141,7 +161,6 @@ def register_with_existing_node(request):
         global blockchain
         chain_dump = response.json()['chain']
         blockchain = create_chain_from_dump(chain_dump)
-        # blockchain.add_peer(response.json()['peers'])
         blockchain.add_peer(node_address)
         return Response("Registration successful", status=200)
     else:
@@ -157,7 +176,7 @@ def verify_and_add_block(request):
                   block_data["timestamp"],
                   block_data["previous_hash"],
                   block_data["nonce"])
-    proof = block_data['hash']
+    proof = block_data['blockhash']
     added = blockchain.add_block(block, proof)
 
     if not added:
@@ -179,7 +198,6 @@ def check_if_chain_tampered(request):
         result = blockchain.check_chain_validity(blockchain.chain)
     except Exception as e:
         raise Exception(f"Problem while calling method check_chain_validity(): {e}")
-
     if result:
         return Response("Votes are not tampered", status=200)
     else:
@@ -203,4 +221,37 @@ def tamper_block(request):
     for i, block in enumerate(blockchain.chain):
         if i == 1:
             block.transactions[0]['candidate'] = 'Hacker'
-    return Response('Hacking successfull')
+    return Response('Blockchain hacked successfully')
+
+
+@api_view(['GET'])
+def sync_with_honest_nodes(request):
+    global blockchain
+    if not len(blockchain.nodes):
+        return Response('Current node is not connected with any other nodes', status=404)
+    print("block::chain inside sync::::::::::", blockchain.chain)
+    longest_chain, current_length = None, len(blockchain.chain)
+
+    for node in blockchain.nodes:
+        response = requests.get(f'{node}/chain')
+        length = response.json()['length']
+        print("length::", length)
+        chain_json = response.json()['chain']
+        print("dump::", chain_json)
+        formatted_chain = Blockchain()
+        formatted_chain.create_genesis_block()
+        formatted_chain.chain = list(
+            map(lambda block_json: Block.from_json(block_json), chain_json)
+        )
+        print("formatted chain::", formatted_chain.chain)
+        if length >= current_length and blockchain.check_chain_validity(formatted_chain.chain):
+            print("inside consensusssssssssssssssssssssssssssssssssssss")
+            print("after::", formatted_chain.chain)
+            current_length, longest_chain = length, formatted_chain.chain
+
+    if longest_chain:
+        print("finally::", longest_chain)
+        blockchain.chain = longest_chain
+        return Response('Synchronized with honest nodes', status=200)
+
+    return Response('All nodes are corrupt', status=404)
