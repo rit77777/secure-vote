@@ -29,6 +29,7 @@ class Blockchain:
         self.chain = []
         self.already_voted = set()
         self.nodes = set()
+        self.is_mining = False
 
     def create_genesis_block(self):
         genesis_block = Block(0, [], 0, "0")
@@ -43,12 +44,17 @@ class Blockchain:
         self.nodes.add(peer)
 
     def add_block(self, block, proof):
+        print("inside add_block")
         previous_hash = self.last_block.blockhash
+        print("add_block::previous_hash", previous_hash)
+        print("add_block::block.previous_hash", block.previous_hash)
 
         if previous_hash != block.previous_hash:
+            print("1111111111111111")
             return False
 
         if not Blockchain.is_valid_proof(block, proof):
+            print("2222222222222222")
             return False
 
         block.blockhash = proof
@@ -76,6 +82,7 @@ class Blockchain:
 
     @classmethod
     def is_valid_proof(cls, block, block_hash):
+        print(f"is_valid_proof::block={block} hash={block_hash}")
         return block_hash.startswith('0' * Blockchain.difficulty) and block_hash == block.compute_hash()
 
     @classmethod
@@ -96,18 +103,21 @@ class Blockchain:
         return result
 
     def mine(self):
-        if not self.unconfirmed_transactions:
+        mining_queue = self.unconfirmed_transactions
+        if not mining_queue:
             return False
 
-        length_pending = len(self.unconfirmed_transactions)
+        self.is_mining = True
+        length_pending = len(mining_queue)
         for _ in range(length_pending):
             prev_block = self.last_block
-            first_unconfirmed_transactions_list = [self.unconfirmed_transactions[0]]
+            first_mining_queue_list = [mining_queue[0]]
             new_block = Block(prev_block.index + 1,
-                              first_unconfirmed_transactions_list,
+                              first_mining_queue_list,
                               str(datetime.datetime.now()),
                               prev_block.blockhash)
             proof = self.proof_of_work(new_block)
             self.add_block(new_block, proof)
-            self.unconfirmed_transactions.pop(0)
+            mining_queue.pop(0)
+        self.is_mining = False
         return True

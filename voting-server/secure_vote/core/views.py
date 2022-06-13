@@ -2,11 +2,13 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth import authenticate, login, logout
+from django.conf import settings
 
 import json
 import requests
 import random
 from hashlib import sha256
+# from twilio.rest import Client
 
 from .models import Constituency, RegisteredVoters, UniqueID
 
@@ -17,6 +19,16 @@ BLOCKCHAIN_NODE_ADDRESS = "http://127.0.0.1:8000"
 
 def send_otp(phone, otp):
     print(f"phone = {phone} and otp = {otp}")
+    # account_sid = settings.TWILIO_ACCOUNT_SID
+    # auth_token = settings.TWILIO_AUTH_TOKEN
+    # client = Client(account_sid, auth_token)
+
+    # message = client.messages.create(
+    #                             body=f'The OTP for verifying your account at Secure Vote is {otp}',
+    #                             from_=settings.TWILIO_PHONE_NO,
+    #                             to=f'+91{phone}'
+    #                         )
+    # print(message.sid)
 
 
 def register_page(request):
@@ -294,7 +306,7 @@ def sync_with_honest_nodes(request):
     if request.method == 'GET':
         try:
             response = requests.get(f"{BLOCKCHAIN_NODE_ADDRESS}/sync_with_honest_nodes")
-            message = response.content
+            message = json.loads(response.content)
             messages.warning(request, message)
             return redirect('all_votes')
         except:
@@ -303,15 +315,15 @@ def sync_with_honest_nodes(request):
 
 def fetch_votes_and_count():
     vote_count = {}
-    res = requests.get(f'{BLOCKCHAIN_NODE_ADDRESS}/chain')
-    data = res.json()['chain']
+    response = requests.get(f'{BLOCKCHAIN_NODE_ADDRESS}/chain')
+    chain_json = response.json()['chain']
 
-    for i in data:
-        for j in i['transactions']:
-            if j['candidate'] in vote_count:
-                vote_count[j['candidate']] += 1
+    for block in chain_json:
+        for transaction in block['transactions']:
+            if transaction['candidate'] in vote_count:
+                vote_count[transaction['candidate']] += 1
             else:
-                vote_count[j['candidate']] = 1
+                vote_count[transaction['candidate']] = 1
     return vote_count
 
 

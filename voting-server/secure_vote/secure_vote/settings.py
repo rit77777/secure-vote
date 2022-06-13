@@ -120,6 +120,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+TWILIO_PHONE_NO = ''
+
+TWILIO_ACCOUNT_SID = ''
+
+TWILIO_AUTH_TOKEN = ''
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
