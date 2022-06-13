@@ -21,4 +21,5 @@ urlpatterns = [
     path('count_votes/', views.count_votes, name='count_votes'),
     path('chart_votes/', views.chart_votes, name='chart_votes'),
     path('register_node/', views.register_node, name='register_node'),
+    path('sync_with_honest_nodes/', views.sync_with_honest_nodes, name='sync_with_honest_nodes'),
 ]

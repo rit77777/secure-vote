@@ -28,10 +28,7 @@ def consensus():
             map(lambda block_json: Block.from_json(block_json), chain_json)
         )
         print("formatted chain::", formatted_chain.chain)
-        # chain_json = json.dumps(chain_json)
         if length > current_length and blockchain.check_chain_validity(formatted_chain.chain):
-        # result = blockchain.check_chain_validity(formatted_chain.chain)
-        # if result:
             print("inside consensusssssssssssssssssssssssssssssssssssss")
             print("after::", formatted_chain.chain)
             current_length, longest_chain = length, formatted_chain.chain
