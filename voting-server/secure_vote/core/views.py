@@ -74,14 +74,8 @@ def register_page(request):
         try:
             otp = str(random.randint(100000, 999999))
             print("cid:  ", unique_id_details.c_id)
-            user = RegisteredVoters.objects.create_user(username=username,
-                                                        name=name,
-                                                        email=email,
-                                                        phone=phone,
-                                                        age=age,
-                                                        password=password,
-                                                        otp=otp,
-                                                        c_id=unique_id_details.c_id)
+            user = RegisteredVoters.objects.create_user(username=username, name=name, email=email, phone=phone, age=age,
+                                                        password=password, otp=otp, c_id=unique_id_details.c_id)
             user.save()
             send_otp(phone, otp)
             request.session['phone'] = phone
@@ -131,7 +125,7 @@ def login_page(request):
         try:
             constituency = Constituency.objects.get(c_id=voter.c_id)
         except:
-            messages.error(request, 'Error in contituency, please contact admin')
+            messages.error(request, 'Error in constituency, please contact admin')
             return redirect('login')
 
         if not constituency.is_active:
@@ -284,14 +278,14 @@ def all_votes(request):
 
     response = requests.get(f"{BLOCKCHAIN_NODE_ADDRESS}/chain_validity")
     is_valid = True if response.status_code == 200 else False
-    validity_message = response.content
+    validity_message = json.loads(response.content)
     print(validity_message, is_valid)
 
     return render(request, 'all_votes.html',
                   {'vote_details': vote_data, 'validity_message': validity_message, 'is_valid': is_valid})
 
 
-@login_required(login_url='login')
+@user_passes_test(lambda u: u.is_superuser)
 def sync_with_honest_nodes(request):
     if request.method == 'GET':
         try:
