@@ -54,11 +54,8 @@ def create_chain_from_dump(chain_dump):
     for i, block_data in enumerate(chain_dump):
         if i == 0:
             continue
-        block = Block(block_data["index"],
-                      block_data["transactions"],
-                      block_data["timestamp"],
-                      block_data["previous_hash"],
-                      block_data["nonce"])
+        block = Block(block_data["index"], block_data["transactions"], block_data["timestamp"],
+                      block_data["previous_hash"], block_data["nonce"])
         proof = block_data['blockhash']
         added = generated_blockchain.add_block(block, proof)
         if not added:
@@ -168,11 +165,8 @@ def register_with_existing_node(request):
 @csrf_exempt
 def verify_and_add_block(request):
     block_data = request.data
-    block = Block(block_data["index"],
-                  block_data["transactions"],
-                  block_data["timestamp"],
-                  block_data["previous_hash"],
-                  block_data["nonce"])
+    block = Block(block_data["index"], block_data["transactions"], block_data["timestamp"],
+                  block_data["previous_hash"], block_data["nonce"])
     proof = block_data['blockhash']
     added = blockchain.add_block(block, proof)
 

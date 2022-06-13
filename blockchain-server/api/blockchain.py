@@ -95,7 +95,6 @@ class Blockchain:
                 block.blockhash, previous_hash = block_hash, block_hash
         return result
 
-
     def mine(self):
         if not self.unconfirmed_transactions:
             return False

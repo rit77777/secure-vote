@@ -5,17 +5,17 @@ from django.utils.timezone import now
 
 class UniqueID(models.Model):
     unique_id = models.CharField(max_length=10, primary_key=True)
-    name = models.CharField(max_length=200,)
+    name = models.CharField(max_length=200, )
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=10, unique=True)
     age = models.IntegerField()
-    address = models.CharField(max_length = 100)
-    pincode = models.CharField(max_length = 6)
-    country = models.CharField(max_length = 100)
-    city = models.CharField(max_length = 100)
-    state = models.CharField(max_length = 100)
+    address = models.CharField(max_length=100)
+    pincode = models.CharField(max_length=6)
+    country = models.CharField(max_length=100)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100)
     c_id = models.CharField(max_length=10, null=True)
-    
+
     def __str__(self):
         return self.unique_id
 

@@ -47,6 +47,10 @@ def register_page(request):
             messages.error(request, 'phone no does not match unique id email')
             return redirect('register')
 
+        if len(phone) != 10:
+            messages.error(request, 'phone no is not valid')
+            return redirect('register')
+
         if int(age) < 18 or int(unique_id_details.age) < 18:
             messages.error(request, 'You must be 18+ to vote')
             return redirect('register')
