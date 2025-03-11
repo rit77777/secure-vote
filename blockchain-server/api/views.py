@@ -1,258 +1,316 @@
-from http.client import responses
 from django.shortcuts import render
-from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.views.decorators.csrf import csrf_exempt
+from rest_framework.views import APIView
+from rest_framework import status
 
-import requests
-import json
 import datetime
 
-from .blockchain import Blockchain, Block
+from .serializers import (TransactionSerializer, BlockSerializer, ChainSerializer,
+                         NodeRegistrationSerializer, MessageResponseSerializer,
+                         ErrorResponseSerializer)
 
+from .blockchain import Blockchain, Block
+from .helpers import consensus, announce_new_block, create_chain_from_dump, sync_with_nodes
+
+# Initialize blockchain
 blockchain = Blockchain()
 blockchain.create_genesis_block()
 
 
-def consensus():
-    global blockchain
-    print("block::chain ::::::::::", blockchain.chain)
-    longest_chain, current_length = None, len(blockchain.chain)
+class TransactionView(APIView):
+    """
+    API view for handling new transaction requests
+    """
+    def post(self, request):
+        serializer = TransactionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                ErrorResponseSerializer({'error': serializer.errors}).data,
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-    for node in blockchain.nodes:
-        response = requests.get(f'{node}/chain')
-        length = response.json()['length']
-        print("length::", length)
-        chain_json = response.json()['chain']
-        print("dump::", chain_json)
-        formatted_chain = Blockchain()
-        formatted_chain.create_genesis_block()
-        formatted_chain.chain = list(map(lambda block_json: Block.from_json(block_json), chain_json))
-        print("formatted chain::", formatted_chain.chain)
-        if length > current_length and blockchain.check_chain_validity(formatted_chain.chain):
-            print("inside consensusssssssssssssssssssssssssssssssssssss")
-            print("after::", formatted_chain.chain)
-            current_length, longest_chain = length, formatted_chain.chain
+        # Early return for duplicate votes
+        if serializer.validated_data["voterhash"] in blockchain.already_voted:
+            return Response(
+                ErrorResponseSerializer({'error': 'You cannot vote more than once'}).data,
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-    if longest_chain:
-        print("finally::", longest_chain)
-        blockchain.chain = longest_chain
-        return True
+        transaction_data = serializer.validated_data
+        transaction_data["timestamp"] = str(datetime.datetime.now())
+        added = blockchain.add_new_transaction(transaction_data)
 
-    return False
-
-
-def announce_new_block(block):
-    for peer in blockchain.nodes:
-        url = f'{peer}/add_block/'
-        headers = {'Content-Type': 'application/json'}
-        response = requests.post(url, data=json.dumps(block.__dict__), headers=headers)
-        print(response.content)
-
-
-def create_chain_from_dump(chain_dump):
-    generated_blockchain = Blockchain()
-    generated_blockchain.create_genesis_block()
-    for i, block_data in enumerate(chain_dump):
-        if i == 0:
-            continue
-        block = Block(block_data["index"], block_data["transactions"], block_data["timestamp"],
-                      block_data["previous_hash"], block_data["nonce"])
-        proof = block_data['blockhash']
-        added = generated_blockchain.add_block(block, proof)
+        # Early return for transaction already in queue
         if not added:
-            raise Exception("The chain dump is tampered!!")
-    return generated_blockchain
+            return Response(
+                ErrorResponseSerializer({'error': 'Your vote is already in queue'}).data,
+                status=status.HTTP_409_CONFLICT
+            )
+
+        return Response(
+            MessageResponseSerializer({'message': 'Vote successfully added'}).data,
+            status=status.HTTP_201_CREATED
+        )
 
 
-@api_view(['POST'])
-@csrf_exempt
-def new_transactions(request):
-    transaction_data = request.data
-    print(transaction_data)
-    required_fields = ["candidate", "voterhash"]
-
-    for field in required_fields:
-        if not transaction_data.get(field):
-            return Response({'error': 'Invalid transaction data'}, status=404)
-
-    if transaction_data["voterhash"] in blockchain.already_voted:
-        return Response({'error': 'You cannot vote more than once'}, status=400)
-
-    transaction_data["timestamp"] = str(datetime.datetime.now())
-    added = blockchain.add_new_transaction(transaction_data)
-
-    if not added:
-        return Response({'error': 'Your vote is already in queue'}, status=404)
-
-    return Response("Success", status=201)
+class ChainView(APIView):
+    """
+    API view for retrieving the blockchain
+    """
+    def get(self, request):
+        chain_data = [block.__dict__ for block in blockchain.chain]
+        serializer = ChainSerializer({
+            "length": len(chain_data),
+            "chain": chain_data,
+            "peers": list(blockchain.nodes)
+        })
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-@api_view(['GET'])
-@csrf_exempt
-def get_chain(request):
-    chain_data = []
-    for block in blockchain.chain:
-        chain_data.append(block.__dict__)
-    data = {
-        "length": len(chain_data),
-        "chain": chain_data,
-        "peers": blockchain.nodes
-    }
-    return Response(data, status=200)
-
-
-@api_view(['GET'])
-@csrf_exempt
-def mine_block(request):
-    prev_length = len(blockchain.chain)
-    if blockchain.is_mining:
-        return Response("Your block is being mined", status=200)
-    else:
+class MineBlockView(APIView):
+    """
+    API view for mining a new block
+    """
+    def get(self, request):
+        # Early return if mining is already in progress
+        if blockchain.is_mining:
+            return Response(
+                {"message": "Your block is being mined"}, 
+                status=status.HTTP_200_OK
+            )
+        
         result = blockchain.mine()
+        
+        # Early return if no transactions to mine
         if not result:
-            return Response("No transactions in queue to mine", status=404)
-        else:
-            chain_length = len(blockchain.chain)
-            backup_chain = blockchain.chain
-            consensus()
-            print("in mine_block: ")
-            print(f"chain: {backup_chain}")
-            print(f"blockchain.chain: {blockchain.chain}")
-            print(f"chain length: {chain_length} and blockchain.chain: {len(blockchain.chain)}")
-            if chain_length == len(blockchain.chain):
-                print("inside announce")
-                for i, block in enumerate(blockchain.chain):
-                    if i>= prev_length:
-                        # announce_new_block(blockchain.last_block)
-                        announce_new_block(block)
-            return Response(f"Block #{blockchain.last_block.index} is mined. Your vote is now added to the blockchain",
-                            status=201)
+            return Response(
+                {"message": "No transactions in queue to mine"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        prev_length = len(blockchain.chain)
+        chain_length = len(blockchain.chain)
+        
+        consensus(blockchain)
+        
+        if chain_length == len(blockchain.chain):
+            for i, block in enumerate(blockchain.chain):
+                if i >= prev_length:
+                    announce_new_block(blockchain, block)
+        
+        return Response(
+            {"message": f"Block #{blockchain.last_block.index} is mined. Your vote is now added to the blockchain"},
+            status=status.HTTP_201_CREATED
+        )
 
 
-@api_view(['POST'])
-@csrf_exempt
-def register_new_peers(request):
-    node_address = request.data["node_address"]
-    if not node_address:
-        return Response("Invalid data", status=400)
-    blockchain.add_peer(node_address[:-1])
-    chain_data = []
-    for block in blockchain.chain:
-        chain_data.append(block.__dict__)
-    data = {
-        "length": len(chain_data),
-        "chain": chain_data,
-        "peers": list(blockchain.nodes)
-    }
-    return Response(data, status=200)
+class RegisterNodeView(APIView):
+    """
+    API view for registering new peer nodes
+    """
+    def post(self, request):
+        serializer = NodeRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                ErrorResponseSerializer({'error': serializer.errors}).data,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        node_address = serializer.validated_data["node_address"]
+        
+        blockchain.add_peer(node_address[:-1])
+        chain_data = [block.__dict__ for block in blockchain.chain]
+        
+        data = {
+            "length": len(chain_data),
+            "chain": chain_data,
+            "peers": list(blockchain.nodes)
+        }
+        return Response(data, status=status.HTTP_200_OK)
 
 
-@api_view(['POST'])
-@csrf_exempt
-def register_with_existing_node(request):
-    node_address = request.data["node_address"]
-    if not node_address:
-        return Response("Invalid data", status=400)
-    print("host: ", request.build_absolute_uri('/'))
-    data = {"node_address": request.build_absolute_uri('/')}
-    headers = {'Content-Type': "application/json"}
-
-    response = requests.post(f'{node_address}/register_node/', data=json.dumps(data), headers=headers)
-    if response.status_code == 200:
-        global blockchain
-        chain_dump = response.json()['chain']
-        blockchain = create_chain_from_dump(chain_dump)
-        blockchain.add_peer(node_address)
-        return Response("Registration successful", status=200)
-    else:
-        return Response(response.content, status=response.status_code)
-
-
-@api_view(['POST'])
-@csrf_exempt
-def verify_and_add_block(request):
-    block_data = request.data
-    print("verify_and_add_block:::data", block_data)
-    block = Block(block_data["index"], block_data["transactions"], block_data["timestamp"],
-                  block_data["previous_hash"], block_data["nonce"])
-    proof = block_data['blockhash']
-    print("verify_and_add_block:::proof", proof)
-    added = blockchain.add_block(block, proof)
-    print("verify_and_add_block:::added", added)
-
-    if not added:
-        return Response("The block was discarded by the node", status=400)
-    return Response("Block added to the chain", status=201)
-
-
-@api_view(['GET'])
-@csrf_exempt
-def pending_transactions(requests):
-    data = blockchain.unconfirmed_transactions
-    return Response(data, status=200)
-
-
-@api_view(['GET'])
-@csrf_exempt
-def check_if_chain_tampered(request):
-    try:
-        result = blockchain.check_chain_validity(blockchain.chain)
-    except Exception as e:
-        raise Exception(f"Problem while calling method check_chain_validity(): {e}")
-    if result:
-        return Response("Votes are not tampered", status=200)
-    else:
-        return Response("Votes are tampered", status=400)
+class RegisterWithNodeView(APIView):
+    """
+    API view for registering with an existing node
+    """
+    def post(self, request):
+        serializer = NodeRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                ErrorResponseSerializer({'error': serializer.errors}).data,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        node_address = serializer.validated_data["node_address"]
+        
+        import json
+        import requests
+        
+        data = {"node_address": request.build_absolute_uri('/')}
+        headers = {'Content-Type': "application/json"}
+        
+        try:
+            response = requests.post(
+                f'{node_address}/register_node/', 
+                data=json.dumps(data), 
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                global blockchain
+                chain_dump = response.json()['chain']
+                blockchain = create_chain_from_dump(chain_dump)
+                blockchain.add_peer(node_address)
+                return Response(
+                    {"message": "Registration successful"}, 
+                    status=status.HTTP_200_OK
+                )
+            
+            return Response(
+                response.json(), 
+                status=response.status_code
+            )
+            
+        except requests.RequestException as e:
+            return Response(
+                {"error": f"Connection error: {str(e)}"}, 
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 
 
-@api_view(['GET'])
-@csrf_exempt
-def reset_blockchain(request):
-    try:
-        blockchain.chain = []
-        blockchain.create_genesis_block()
-        return Response("Reset successful", status=200)
-    except Exception as e:
-        raise Exception(f"An error occurred while replacing chain: {e}")
+class AddBlockView(APIView):
+    """
+    API view for verifying and adding a block
+    """
+    def post(self, request):
+        serializer = BlockSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                ErrorResponseSerializer({'error': serializer.errors}).data,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        block_data = serializer.validated_data
+        
+        block = Block(
+            block_data["index"], 
+            block_data["transactions"], 
+            block_data["timestamp"],
+            block_data["previous_hash"], 
+            block_data["nonce"]
+        )
+        proof = block_data['blockhash']
+        
+        added = blockchain.add_block(block, proof)
+        
+        if not added:
+            return Response(
+                {"error": "The block was discarded by the node"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        return Response(
+            {"message": "Block added to the chain"}, 
+            status=status.HTTP_201_CREATED
+        )
 
 
-@api_view(['GET'])
-def tamper_block(request):
-    global blockchain
-    for i, block in enumerate(blockchain.chain):
-        if i == 1:
-            block.transactions[0]['candidate'] = 'Hacker'
-            return Response('Blockchain hacked successfully', status=200)
-    return Response('No blocks in blockchain', status=404)
+class PendingTransactionsView(APIView):
+    """
+    API view for retrieving pending transactions
+    """
+    def get(self, request):
+        return Response(
+            blockchain.unconfirmed_transactions, 
+            status=status.HTTP_200_OK
+        )
 
 
-@api_view(['GET'])
-def sync_with_honest_nodes(request):
-    global blockchain
-    if not len(blockchain.nodes):
-        return Response('Current node is not connected with any other nodes', status=404)
-    print("block::chain inside sync::::::::::", blockchain.chain)
-    longest_chain, current_length = None, len(blockchain.chain)
+class ChainValidityView(APIView):
+    """
+    API view for checking if the chain has been tampered with
+    """
+    def get(self, request):
+        try:
+            result = blockchain.check_chain_validity(blockchain.chain)
+            
+            if result:
+                return Response(
+                    {"message": "Votes are not tampered"}, 
+                    status=status.HTTP_200_OK
+                )
+            
+            return Response(
+                {"error": "Votes are tampered"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error checking chain validity: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-    for node in blockchain.nodes:
-        response = requests.get(f'{node}/chain')
-        length = response.json()['length']
-        print("length::", length)
-        chain_json = response.json()['chain']
-        print("dump::", chain_json)
-        formatted_chain = Blockchain()
-        formatted_chain.create_genesis_block()
-        formatted_chain.chain = list(map(lambda block_json: Block.from_json(block_json), chain_json))
-        print("formatted chain::", formatted_chain.chain)
-        if length >= current_length and blockchain.check_chain_validity(formatted_chain.chain):
-            print("inside consensusssssssssssssssssssssssssssssssssssss")
-            print("after::", formatted_chain.chain)
-            current_length, longest_chain = length, formatted_chain.chain
 
-    if longest_chain:
-        print("finally::", longest_chain)
-        blockchain.chain = longest_chain
-        return Response('Synchronized with honest nodes', status=200)
+class ResetBlockchainView(APIView):
+    """
+    API view for resetting the blockchain
+    """
+    def get(self, request):
+        try:
+            blockchain.chain = []
+            blockchain.create_genesis_block()
+            return Response(
+                {"message": "Reset successful"}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Error resetting blockchain: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-    return Response('All nodes are corrupt', status=404)
+
+class TamperBlockView(APIView):
+    """
+    API view for tampering with a block (for testing purposes)
+    """
+    def get(self, request):
+        if len(blockchain.chain) <= 1:
+            return Response(
+                {"error": "No blocks in blockchain to tamper with"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        block = blockchain.chain[1]
+        block.transactions[0]['candidate'] = 'Hacker'
+        
+        return Response(
+            {"message": "Blockchain hacked successfully"}, 
+            status=status.HTTP_200_OK
+        )
+
+
+class SyncWithNodesView(APIView):
+    """
+    API view for synchronizing with honest nodes
+    """
+    def get(self, request):
+        if not blockchain.nodes:
+            return Response(
+                {"error": "Current node is not connected with any other nodes"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        success, message = sync_with_nodes(blockchain)
+        
+        if success:
+            return Response(
+                {"message": message}, 
+                status=status.HTTP_200_OK
+            )
+        
+        return Response(
+            {"error": message}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
