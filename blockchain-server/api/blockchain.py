@@ -3,6 +3,7 @@ import json
 import logging
 from hashlib import sha256
 from typing import List, Set, Dict, Any, Optional
+from .models import IBlockchain, Block as BlockModel
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class Block:
         return Block(**block_json)
 
 
-class Blockchain:
+class BlockchainInMemory(IBlockchain):
     # Class constants
     DIFFICULTY = 4
     
